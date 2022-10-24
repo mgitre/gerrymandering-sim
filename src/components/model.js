@@ -1,8 +1,8 @@
 import React from 'react';
 //import ReactDOM from 'react-dom/client';
-//import Mouse from './utils/Mouse';
+import Mouse from './utils/Mouse';
 import './model.css'
-import DistrictManager from './utils/Districts';
+import {District, DistrictManager} from './utils/Districts';
 import Voter from './utils/Voter';
 
 
@@ -13,8 +13,8 @@ class Model extends React.Component {
     this.canvasRef = React.createRef();
     this.width = this.props.size*2;
     this.height = this.props.size*2;
-    this.district_size = 10;
-    this.grid_size = 10;
+    this.district_size = 9;
+    this.grid_size = 9;
     this.cell_size = this.width/this.grid_size;
     //let grid = [[1,1,1,0,0], [1,1,1,0,0], [1,1,1,0,0], [1,1,1,0,0], [1,1,1,0,0]];
     //let grid = [[1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0],[1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0], [1,0,1,1,0,0,1,1,0,0]]
@@ -53,10 +53,11 @@ class Model extends React.Component {
     return voters;
   }
   
-  drawBG() {
-    const canvas = this.canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = '333';
+  drawBG(ctx) {
+    //const canvas = this.canvasRef.current;
+    //const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = 'rgb(0,0,0)';
+    ctx.lineWidth = 1;
     for(let i = 1; i < this.grid_size; i++) {
       ctx.beginPath();
       ctx.moveTo(i*this.cell_size, 0);
@@ -83,15 +84,20 @@ class Model extends React.Component {
     const canvas = this.canvasRef.current;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, this.width, this.height);
-    this.drawBG();
-    this.voters.forEach(voter => voter.draw(ctx));
     this.districtManager.draw(ctx);
+    this.drawBG(ctx);
+    this.voters.forEach(voter => voter.draw(ctx));
+    
   }
 
   update() {
-    const district_winners = this.districtManager.districts.map(district => district.getWinner());
+    const districts = [...this.districtManager.districts, this.districtManager.currently_drawing];
+    const district_winners = districts.map(district => district.voters.length==this.district_size ? district.getWinner() : null);
     let winner_counts = {};
     for(let winner of district_winners) {
+      if(winner === null) {
+        continue;
+      }
       winner_counts[winner] = (winner_counts[winner] || 0) + 1;
     };
     this.setState({districts: winner_counts});
@@ -141,4 +147,39 @@ function Stats(props) {
   )
 }
 
-export default Model;
+class DistrictDrawModel extends Model {
+  constructor(props) {
+    super(props);
+    this.districts_interactive = true;
+  }
+}
+
+class VoterSwitchModel extends Model {
+  constructor(props) {
+    super(props);
+    this.voters_interactive = true;
+    this.districts_interactive = false;
+    this.districts = [new District(this.voters.slice(0, 9), this.cell_size, this.district_size, this.colors)];
+  }
+  componentDidMount() {
+    super.componentDidMount();
+    this.mouse = new Mouse('a', this.target, (x, y) => this.mouseMove(x, y), (x, y) => this.mouseDown(x, y), (x, y) => this.mouseUp(x, y));
+  }
+  mouseDown(x,y) {
+    const row = Math.min(Math.max(Math.floor(y / this.cell_size), 0), this.grid_size-1);
+    const col = Math.min(Math.max(Math.floor(x / this.cell_size), 0), this.grid_size-1);
+    const voter = this.voters[row*this.grid_size + col];
+    voter.party = (voter.party + 1) % 2;
+    voter.color = this.colors[voter.party];
+    this.update();
+
+  }
+  mouseUp() {
+  
+  }
+  mouseMove() {
+
+  }
+}
+
+export {Model, DistrictDrawModel, VoterSwitchModel};

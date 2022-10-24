@@ -11,6 +11,9 @@ class District {
 
 
     getWinner() {
+        /*if (this.voters.length !== this.district_size) {
+            return null;
+        }*/
         const parties = this.voters.map(v => v.party);
         // return the party that appears most often, or 2 if there is a tie
         const party_counts = parties.reduce((acc, party) => {
@@ -40,6 +43,7 @@ class District {
         queue.push(voters[0]);
         while (queue.length > 0) {
             let voter = queue.shift();
+            //console.log(this.voters);
             if (visited.includes(voter)) {
                 continue;
             }
@@ -62,11 +66,23 @@ class District {
     }
 
     draw(ctx) {
+        if(this.voters.length === 0) {
+            return;
+        }
         const all_coords = this.voters.map(v => [v.row, v.col]);
         this.color = this.getColor(this.voters);
+        
         this.drawShape(ctx, all_coords, this.color); 
     }
     
+    highlight(ctx, color) {
+        for(let voter of this.voters) {
+            const [row, col] = [voter.row, voter.col];
+            ctx.fillStyle = color;
+            ctx.fillRect(col*this.cell_size, row*this.cell_size, this.cell_size, this.cell_size);
+        }
+    }
+
     getNeighbors(voter) {
         let neighbors = [];
         let row = voter.row;
@@ -86,17 +102,22 @@ class District {
 
     //drawing functions. please forgive me. i don't know how to do this better
     addOpacity(color, opacity) {
-        const [r, g, b] = color.slice(4, -1).split(',').map(c => parseInt(c));
+        let [r, g, b] = color.slice(4, -1).split(',').map(c => parseInt(c));
+        let base_color = [255, 255, 255];
+        let new_color = [r, g, b].map((c, i) => Math.round(c*opacity + base_color[i]*(1-opacity)));
+        //return `rgba(${new_color[0]}, ${new_color[1]}, ${new_color[2]}, 1)`;
         return `rgba(${r},${g},${b},${opacity})`;
     }
 
     getColor(voters) {
         //return grey if there aren't exactly 5 voters
-        if (voters.length !== this.district_size) {
+        /*if (voters.length !== this.district_size) {
             return 'rgba(128,128,128,0.3)';
         } else {
             return this.addOpacity(this.colors[this.getWinner()], 0.3);
-        }
+        }*/
+        const opacity = voters.length == this.district_size ? 0.5 : 0.3;
+        return this.addOpacity(this.colors[this.getWinner()], opacity);
     }
 
     getEdges(coords) {
@@ -127,7 +148,7 @@ class District {
                 }
             }
         }
-        ctx.fillStyle = color;
+        
         ctx.beginPath();
         for (let coord of coords) {
             this.drawCell(ctx, coord);
@@ -142,8 +163,10 @@ class District {
             }
             
         }
+        ctx.fillStyle = color;
         ctx.fill();
     }
+
 
     drawEdge(ctx, coord1, coord2, width) {
         const [row1, col1] = coord1;
@@ -174,10 +197,16 @@ class District {
         const bottommost = Math.max(row1, row2, row3, row4);
         ctx.rect(leftmost*this.cell_size+this.cell_size/2, topmost*this.cell_size+this.cell_size/2, (rightmost-leftmost)*this.cell_size, (bottommost-topmost)*this.cell_size);
     }
-    drawCell(ctx, coord, r) {
+    drawCell(ctx, coord, highlighted, r) {
         const radius = r || 40;
+        const highlit = highlighted || false;
         const [row, col] = coord;
         ctx.arc(col*this.cell_size+this.cell_size/2, row*this.cell_size+this.cell_size/2, radius, 0, 2.1*Math.PI);
+        if (highlighted) {
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+        }
     }
     areNeighbors(coord1, coord2) {
         const [row1, col1] = coord1;
@@ -202,10 +231,17 @@ class District {
 
 class DistrictManager {
     constructor(model) {
+        if(model.districts) {
+            this.districts = model.districts;
+        } else {
+            this.districts = [];
+        }
         this.model = model;
         this.mousetarget = model.canvasRef.current;
-        this.mouse = new Mouse(model.props.id, this.mousetarget, (x, y) => this.mouseMove(x, y), (x, y) => this.mouseDown(x, y), (x, y) => this.mouseUp(x, y));
-        this.districts = [];
+        const use_mouse = model.districts_interactive;
+        if(use_mouse) {
+            this.mouse = new Mouse(model.props.id, this.mousetarget, (x, y) => this.mouseMove(x, y), (x, y) => this.mouseDown(x, y), (x, y) => this.mouseUp(x, y));
+        }
         this.currently_drawing = new District([], this.model.cell_size, this.model.district_size, this.model.colors);
         this.currently_drawing_path = [];
         this.voters = this.model.voters;
@@ -237,18 +273,41 @@ class DistrictManager {
         if (district) {
             //remove the district from the list of districts
             this.districts = this.districts.filter(d => d !== district);
+            this.currently_drawing = district;
         }
-        //add the district to the currently drawing list
-        this.currently_drawing.addVoter(this.voters[col+row*this.model.grid_size]);
+        else {
+            this.currently_drawing.addVoter(this.voters[col+row*this.model.grid_size]);
+        }
         this.currently_drawing_path.push(row*this.model.grid_size+col);
         this.model.update();
     }
     mouseUp(x, y) {
         //see if the currently drawing district is valid
-        if (this.currently_drawing.voters.length == this.model.district_size) {
+        /*if (this.currently_drawing.voters.length == this.model.district_size) {
             //add the district to the list of districts
             this.districts.push(this.currently_drawing);
+        }*/
+        if(this.currently_drawing.voters.length > 0) {
+            this.districts.push(this.currently_drawing);
         }
+        //trying to handle the case where the user clicks on a cell that is already in a district and doesnt extend the district
+        /*if(this.currently_drawing_path.length==1) {
+            const voter = this.voters[this.currently_drawing_path[0]];
+            console.log(this.currently_drawing_path, voter);
+            const [row, col] = [voter.row, voter.col];
+            const district = this.getDistrict(row, col);
+            if(district) {
+                district.removeVoter(this.getVoter(row, col));
+                if(district.voters.length==0) {
+                    this.districts = this.districts.filter(d => d !== district);
+                }
+                const split = district.findSplit();
+                if(split) {
+                    this.districts = this.districts.filter(d => d !== district);
+                    this.districts.push(new District(split[0], this.model.cell_size, this.model.district_size, this.model.colors), new District(split[1], this.model.cell_size, this.model.district_size, this.model.colors));
+                }
+            }
+        }*/
         //clear the currently drawing district
         this.currently_drawing = new District([], this.model.cell_size, this.model.district_size, this.model.colors);
         this.currently_drawing_path = [];
@@ -286,7 +345,19 @@ class DistrictManager {
         const district = this.getDistrict(row, col);
         if (district) {
             //remove the district from the list of districts
-            this.districts = this.districts.filter(d => d !== district);
+            //this.districts = this.districts.filter(d => d !== district);
+
+
+            district.removeVoter(voter);
+            if(district.voters.length == 0) {
+                this.districts = this.districts.filter(d => d !== district);
+            } else {
+                const split = district.findSplit();
+                if (split) {
+                    this.districts = this.districts.filter(d => d !== district);
+                    this.districts.push(new District(split[0], this.model.cell_size, this.model.district_size, this.model.colors), new District(split[1], this.model.cell_size, this.model.district_size, this.model.colors));
+                }
+            }   
         }
         //if the cell is not in the currently drawing list, add it
         if (!this.currently_drawing.contains(voter)) {
@@ -302,6 +373,10 @@ class DistrictManager {
         //draw each district
         for (let i = 0; i < this.districts.length; i++) {
             const district = this.districts[i];
+            const ishighlighted = district.voters.length != this.model.district_size;
+            if (ishighlighted) {
+                district.highlight(ctx, 'rgba(256, 196, 0, 0.2)');
+            }
             district.draw(ctx);
         }
         //draw the currently drawing district
@@ -310,4 +385,4 @@ class DistrictManager {
 
 }
 
-export default DistrictManager;
+export {District, DistrictManager};
