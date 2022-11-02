@@ -1,192 +1,379 @@
+//complete rewrite of Districts.js because it was a mess
+
 import Mouse from './Mouse';
 
-class District {
-    constructor(voters, cell_size, district_size, colors) {
-        this.voters = voters;
-        this.colors = colors;
-        this.color = 'rgba(0,0,0,0.3)';
-        this.district_size = district_size;
-        this.cell_size = cell_size;
+function arrayEquals(arr1, arr2) {
+    if(!arr1 || !arr2) return false;
+    return arr1.length === arr2.length && arr1.every((val, index) => val === arr2[index]);
+}
+function arrayIncludes(arr, subarr) {
+    return arr.some((val, index) => arrayEquals(val, subarr));
+}
+
+class DistrictManager {
+    constructor(model){
+        this.model = model;
+        if(this.model.districts_interactive) {
+            this.mouse = new Mouse(0, this.model.canvas, (x, y) => this.mouseMove(x, y), (x, y) => this.mouseDown(x, y), (x, y) => this.mouseUp(x, y));
+            this.currently_drawing_district = null;
+            this.has_mouse_moved = false;
+            this.last_mouse_pos = null;
+        }
     }
 
+    getVoter(row, col) {
+        return this.model.voters[row][col];
+    }
 
-    getWinner() {
-        /*if (this.voters.length !== this.district_size) {
-            return null;
-        }*/
-        const parties = this.voters.map(v => v.party);
-        // return the party that appears most often, or 2 if there is a tie
-        const party_counts = parties.reduce((acc, party) => {
-            acc[party] = acc[party] + 1 || 1;
-            return acc;
-        }, {});
-        const max_count = Math.max(...Object.values(party_counts));
-        const winners = Object.keys(party_counts).filter(party => party_counts[party] === max_count);
-        if (winners.length === 1) {
-            return winners[0];
-            
+    getDistrict(row, col) {
+        const voter = this.getVoter(row, col);
+        for(let district of this.model.districts){
+            if(district.voters.includes(voter)){
+                return district;
+            }
+        }
+    }
+
+    getDistrictByVoter(voter) {
+        for(let district of this.model.districts){
+            if(district.voters.includes(voter)){
+                return district;
+            }
+        }
+    }
+
+    getPos(x, y) {
+        const row = Math.min(Math.max(Math.floor(y / this.model.cell_size), 0), this.model.rows-1);
+        const col = Math.min(Math.max(Math.floor(x / this.model.cell_size), 0), this.model.cols-1);
+        return [row, col];
+    }
+    //wanted mouse behavior:
+    /*
+    if mouse is clicked on an empty cell, create a new district containing that cell
+    if mouse is clicked on a cell in a district, build off of that district
+    if mouse is moved over a cell, add that cell to the current district (only if valid)
+    if mouse is moved over a cell in another district, remove that cell from that district (and split that district if necessary)
+    if mouse is clicked on a cell in a district and then let go without moving, remove that cell from that district (and split that district if necessary)
+    */
+
+    mouseDown(x, y) {
+        console.log(x,y)
+        const [row, col] = this.getPos(x, y);
+        this.last_mouse_pos = [row, col];
+        this.has_mouse_moved = false;
+        const voter = this.getVoter(row, col);
+        const district = this.getDistrict(row, col);
+
+        //if the cell is not in a district, create a new district with that cell
+        if(!district){
+            this.currently_drawing_district = new District(this.model, [voter]);
+            this.model.districts.push(this.currently_drawing_district);
+            this.model.update();
+        }
+        //if the cell is in a district, build off of that district
+        else{
+            this.currently_drawing_district = district;
+        }
+    }
+    mouseMove(x, y) {
+        //if mouse isn't down, do nothing
+        if(!this.mouse.pressed) return;
+        const [row, col] = this.getPos(x, y);
+        //if the mouse hasn't moved, don't do anything
+        if(arrayEquals(this.last_mouse_pos, [row, col])){
+            return;
         } else {
-            return 2;
+            this.has_mouse_moved = true;
+            this.last_mouse_pos = [row, col];
         }
-    }
-
-    findSplit() {
-        //find the two districts that would be created if a voter were removed
-        let voters = this.voters;
-        let visited = [];
-        let queue = [];
-        let district1 = [];
-        let num_voters = voters.length;
-        let num_visited = 0;
-
-        //first, find the district of all voters neighboring the first one
-        queue.push(voters[0]);
-        while (queue.length > 0) {
-            let voter = queue.shift();
-            //console.log(this.voters);
-            if (visited.includes(voter)) {
-                continue;
-            }
-            visited.push(voter);
-            num_visited += 1;
-            district1.push(voter);
-            for (let neighbor of this.getNeighbors(voter)) {
-                if (!visited.includes(neighbor) && !queue.includes(neighbor)) {
-                    queue.push(neighbor);
-                }
-            }
-        }
-        //if all voters were visited, then there is no split
-        if (num_visited === num_voters) {
-            return null;
-        }
-        //otherwise, the remaining voters are in the second district
-        let district2 = voters.filter(v => !district1.includes(v));
-        return [district1, district2];
-    }
-
-    draw(ctx) {
-        if(this.voters.length === 0) {
+        const voter = this.getVoter(row, col);
+        //if the cell is in a district, handle
+        //if the district containing the cell is static, do nothing
+        const district = this.getDistrict(row, col);
+        if(district && district.static){
             return;
         }
-        const all_coords = this.voters.map(v => [v.row, v.col]);
-        this.color = this.getColor(this.voters);
-        
-        this.drawShape(ctx, all_coords, this.color); 
+        //see if cell can be added to the current district
+        if(this.currently_drawing_district.canAddVoter(voter)){
+            this.currently_drawing_district.addVoter(voter);
+        } else {
+            //if it cant be added, don't do anything
+            return;
+        }
+        //if the cell is in a district, remove it from that district
+        if(district && district !== this.currently_drawing_district){
+            district.removeVoter(voter);
+        }
+
+        this.model.update();
+
     }
-    
-    highlight(ctx, color) {
-        for(let voter of this.voters) {
-            const [row, col] = [voter.row, voter.col];
-            ctx.fillStyle = color;
-            ctx.fillRect(col*this.cell_size, row*this.cell_size, this.cell_size, this.cell_size);
+    mouseUp(x, y) {
+        this.currently_drawing_district = null;
+        //if mouse hasn't moved, remove the cell from the district
+        if(!this.has_mouse_moved){
+            const [row, col] = this.getPos(x, y);
+            const voter = this.getVoter(row, col);
+            const district = this.getDistrict(row, col);
+            if(district && !district.static){
+                district.removeVoter(voter);
+            }
+            this.model.update();
         }
     }
+}
 
-    getNeighbors(voter) {
-        let neighbors = [];
-        let row = voter.row;
-        let col = voter.col;
-        let voters = this.voters;
-        for (let i = 0; i < voters.length; i++) {
-            let other = voters[i];
-            if (other.equals(voter)) {
-                continue;
+class District {
+    constructor(model, voters, is_static = false) {
+        this.model = model;
+        this.voters = voters;
+        this.min_pop = 1;
+        this.static = is_static;
+    }
+    //this does not do any checking - make sure to check before calling this
+    addVoter(voter) {
+        this.voters.push(voter);
+    }
+
+    canAddVoter(voter) {
+        //if the district is static, you can't add voters
+        if(this.is_static) return false;
+        //if the voter is already in the district, return false
+        if(this.voters.includes(voter)){
+            return false;
+        }
+        //if the district is full, return false
+        if(this.voters.length >= this.model.district_size){
+            return false;
+        }
+        //if the voter doesn't have any neighbors in the district, return false
+        const [row, col] = [voter.row, voter.col];
+        const neighbors = this.getNeighbors([row, col]);
+        if(neighbors.length === 0){
+            return false;
+        }
+        /*const district_coords = this.voters.map(voter => [voter.row, voter.col]);
+        let has_neighbor = false;
+        for(let coord of district_coords){
+            if(this.areNeighbors(coord, [row, col])){
+                has_neighbor = true;
             }
-            if (Math.abs(other.row - row) <= 1 && Math.abs(other.col - col) <= 1) {
-                neighbors.push(other);
+        }
+        if(!has_neighbor){
+            return false;
+        }*/
+        return true;
+    }
+
+    removeVoter(voter) {
+        this.voters = this.voters.filter(v => !v.equals(voter));
+        this.postRemove();
+    }
+
+    includes(voter) {
+        return this.voters.some(v => v.equals(voter));
+    }
+    areNeighbors(coord1, coord2) {
+        return Math.abs(coord1[0]-coord2[0]) + Math.abs(coord1[1]-coord2[1]) === 1
+    }
+    //get the coordinates of all cells neighboring a cell that are in the district
+    getNeighbors(coord) {
+        //return all neighbors of a coordinate that are in the district
+        const [row, col] = coord;
+        const neighbors = [];
+        if(row > 0){
+            if(this.includes(this.model.voters[row-1][col])){
+                neighbors.push([row-1, col]);
+            }
+        }
+        if(row < this.model.rows-1){
+            if(this.includes(this.model.voters[row+1][col])){
+                neighbors.push([row+1, col]);
+            }
+        }
+        if(col > 0){
+            if(this.includes(this.model.voters[row][col-1])){
+                neighbors.push([row, col-1]);
+            }
+        }
+        if(col < this.model.cols-1){
+            if(this.includes(this.model.voters[row][col+1])){
+                neighbors.push([row, col+1]);
             }
         }
         return neighbors;
     }
 
-    //drawing functions. please forgive me. i don't know how to do this better
-    addOpacity(color, opacity) {
-        let [r, g, b] = color.slice(4, -1).split(',').map(c => parseInt(c));
-        let base_color = [255, 255, 255];
-        let new_color = [r, g, b].map((c, i) => Math.round(c*opacity + base_color[i]*(1-opacity)));
-        //return `rgba(${new_color[0]}, ${new_color[1]}, ${new_color[2]}, 1)`;
-        return `rgba(${r},${g},${b},${opacity})`;
+    getVoter(row, col) {
+        return this.model.voters[row][col];
     }
 
-    getColor(voters) {
-        //return grey if there aren't exactly 5 voters
-        /*if (voters.length !== this.district_size) {
-            return 'rgba(128,128,128,0.3)';
+    postRemove() {
+        //if the district is empty, remove it
+        if(this.voters.length < this.min_pop){
+            this.model.districts = this.model.districts.filter(district => !district.equals(this));
         } else {
-            return this.addOpacity(this.colors[this.getWinner()], 0.3);
-        }*/
-        const opacity = voters.length == this.district_size ? 0.5 : 0.3;
-        return this.addOpacity(this.colors[this.getWinner()], opacity);
+            //if the district is not empty, split it
+            this.split();
+        }
     }
 
+    //split the district into two districts if it's no longer contiguous
+    split() {
+        //wanted behavior:
+        /*
+        if the district is contiguous, do nothing
+        if the district is not contiguous, return 2 lists of voters, each of which is contiguous
+        */
+        //start with the first voter in the district and find all voters that are connected to it
+        console.log("splitting");
+        const voters = this.voters;
+        const district_coords = voters.map(voter => [voter.row, voter.col]);
+        const visited = [];
+        const queue = [district_coords[0]];
+        while(queue.length > 0){
+            const coord = queue.shift();
+            visited.push(coord);
+            for(let neighbor of this.getNeighbors(coord)){
+                if(!arrayIncludes(visited, neighbor) && !arrayIncludes(queue, neighbor)){
+                    queue.push(neighbor);
+                }
+            }
+        }
+        console.log('splat');
+        //if the number of visited voters is the same as the number of voters in the district, the district is contiguous
+        if(visited.length === voters.length){
+            return;
+        }
+        //if the district is not contiguous, split it into two districts
+        const district1 = new District(this.model, visited.map(coord => this.getVoter(coord[0], coord[1])));
+        const district2 = new District(this.model, voters.filter(voter => !district1.includes(voter)));
+        this.model.districts.push(district1, district2);
+        this.model.districts = this.model.districts.filter(district => !district.equals(this));
+    }
+
+    equals(district) {
+        if(this===district) return true;
+        if(this.voters.length !== district.voters.length) return false;
+        for(let voter of this.voters){
+            if(!district.includes(voter)) return false;
+        }
+        return true;
+    }
+
+    //drawing functions. kill me now
+    draw() {
+        const ctx = this.model.ctx;
+        const coords = this.voters.map(v => [v.row, v.col]);
+        this.drawShape(ctx, coords);
+    }
+
+    
+    //helper functions for drawing the district shape
+    coordToPos(coord) {
+        return coord[1]*this.model.rows + coord[0];
+    }
+
+    posToCoord(pos) {
+        return [Math.floor(pos/this.model.rows), pos%this.model.rows];
+    }
+    
+    //gets color for district
+    getColor(solid) {
+        const party = this.getWinning();
+        //in form #rrggbbaa
+        let c = this.model.colors[party];
+        //const opacity = this.voters.length === this.model.district_size ? '88' : '55';
+        //c = c.slice(0, 7) + opacity;
+        if(solid){
+            c = c.slice(0, 7) + 'ff';
+            return c
+        }
+        //this is for not-really-opaque colors
+        const opacity = this.voters.length === this.model.district_size ? 0.5 : 0.3;
+        c = this.opacityToColor(c, '#ffffffff', opacity);
+        return c;
+    }
+
+    opacityToColor(color, baseColor, opacity) {
+        const c = color.slice(1);
+        const r = parseInt(c.slice(0, 2), 16);
+        const g = parseInt(c.slice(2, 4), 16);
+        const b = parseInt(c.slice(4, 6), 16);
+        const bc = baseColor.slice(1);
+        const br = parseInt(bc.slice(0, 2), 16);
+        const bg = parseInt(bc.slice(2, 4), 16);
+        const bb = parseInt(bc.slice(4, 6), 16);
+        const nr = Math.floor(r*opacity + br*(1-opacity));
+        const ng = Math.floor(g*opacity + bg*(1-opacity));
+        const nb = Math.floor(b*opacity + bb*(1-opacity));
+        return `#${nr.toString(16)}${ng.toString(16)}${nb.toString(16)}ff`;
+    }
+    //finds all shared edges between voters
     getEdges(coords) {
-        let shared_edges = [];
-        //see if any of the coordinates neighbor one another
-        for (let i = 0; i < coords.length; i++) {
-            for (let j = i+1; j < coords.length; j++) {
-                if (this.areNeighbors(coords[i], coords[j])) {
-                    shared_edges.push([coords[i], coords[j]]);
+        const edges = [];
+        for(let i = 0; i < coords.length; i++) {
+            const coord = coords[i];
+            for(let j = i+1; j < coords.length; j++) {
+                const other_coord = coords[j];
+                if(this.areNeighbors(coord, other_coord)) {
+                    edges.push([coord, other_coord]);
                 }
             }
         }
-        return shared_edges;
+        return edges;
     }
-
-    drawShape(ctx, coords, color) {
-        let shared_edges = this.getEdges(coords);
-
-        let shared_corners = [];
-        //see if any two edges are side-by-side to find shared corners
-        for (let i = 0; i < shared_edges.length; i++) {
-            for (let j = i+1; j < shared_edges.length; j++) {
-                let [edge1, edge2] = [shared_edges[i], shared_edges[j]];
-                //if the two edges share a cell, skip 
-                if(edge1[0] == edge2[0] || edge1[0] == edge2[1] || edge1[1] == edge2[0] || edge1[1] == edge2[1]) { continue; }
-                if ((this.areNeighbors(edge1[0], edge2[0]) && this.areNeighbors(edge1[1], edge2[1])) || (this.areNeighbors(edge1[0], edge2[1]) && this.areNeighbors(edge1[1], edge2[0]))) {
-                    shared_corners.push([edge1[0], edge2[0], edge1[1], edge2[1]]);
+    
+    //finds all shared corners
+    getCorners(edges) {
+        const corners = [];
+        for(let i=0; i < edges.length; i++) {
+            const edge1 = edges[i];
+            for(let j=i+1; j < edges.length; j++) {
+                const edge2 = edges[j];
+                //if the edges share a cell, continue
+                if(arrayEquals(edge1[0], edge2[0]) || arrayEquals(edge1[0], edge2[1]) || arrayEquals(edge1[1], edge2[0]) || arrayEquals(edge1[1], edge2[1])) {
+                    continue;
+                }
+                //if the two edges are side by side (order independent), they share a corner
+                if((this.areNeighbors(edge1[0], edge2[0]) && this.areNeighbors(edge1[1], edge2[1])) || (this.areNeighbors(edge1[0], edge2[1]) && this.areNeighbors(edge1[1], edge2[0]))) {
+                    corners.push([edge1[0], edge1[1], edge2[0], edge2[1]]);
                 }
             }
         }
-        
-        ctx.beginPath();
-        for (let coord of coords) {
-            this.drawCell(ctx, coord);
-            
-            let neighboring_edges = shared_edges.filter(edge => edge.includes(coord));
-            for (let edge of neighboring_edges) {
-                this.drawEdge(ctx, edge[0], edge[1]);
-            }
-            let neighboring_corners = shared_corners.filter(corner => corner.includes(coord));
-            for (let corner of neighboring_corners) {
-                this.drawCorner(ctx, corner[0], corner[1], corner[2], corner[3]);
-            }
-            
-        }
-        ctx.fillStyle = color;
-        ctx.fill();
+        return corners;
     }
 
+    drawCell(ctx, coord) {
+        const cell_size = this.model.cell_size;
+        const x = coord[1]*cell_size + cell_size/2;
+        const y = coord[0]*cell_size + cell_size/2;
+        //ctx.beginPath();
+        ctx.arc(x, y, this.model.blob_radius, 0, 2 * Math.PI);
+        //ctx.fill();
+    }
 
-    drawEdge(ctx, coord1, coord2, width) {
+    drawEdge(ctx, edge) {
+        const [coord1, coord2] = edge;
         const [row1, col1] = coord1;
         const [row2, col2] = coord2;
-        const edgeWidth = width || 80;
+        const edgeWidth = this.model.blob_radius * 2;
         //determine if the edge is horizontal or vertical
         if (row1 === row2) {
             //horizontal edge
             const leftmost = Math.min(col1, col2);
             //draw a rectangle from (col1, row1) to (col2, row1)
-            ctx.rect(leftmost*this.cell_size+this.cell_size/2, row1*this.cell_size+this.cell_size/2-edgeWidth/2, this.cell_size, edgeWidth);
+            ctx.rect(leftmost*this.model.cell_size+this.model.cell_size/2, row1*this.model.cell_size+this.model.cell_size/2-edgeWidth/2, this.model.cell_size, edgeWidth);
         } else {
             //vertical edge
             const topmost = Math.min(row1, row2);
             //draw a rectangle from (col1, row1) to (col1, row2)
-            ctx.rect(col1*this.cell_size+this.cell_size/2-edgeWidth/2, topmost*this.cell_size+this.cell_size/2, edgeWidth, this.cell_size);
+            ctx.rect(col1*this.model.cell_size+this.model.cell_size/2-edgeWidth/2, topmost*this.model.cell_size+this.model.cell_size/2, edgeWidth, this.model.cell_size);
         }
     }
-    drawCorner(ctx, coord1, coord2, coord3, coord4) {
-        //draw a rectangle with the given coordinates as the corners
+
+    drawCorner(ctx, corner) {
+        const [coord1, coord2, coord3, coord4] = corner;
         const [row1, col1] = coord1;
         const [row2, col2] = coord2;
         const [row3, col3] = coord3;
@@ -195,194 +382,84 @@ class District {
         const topmost = Math.min(row1, row2, row3, row4);
         const rightmost = Math.max(col1, col2, col3, col4);
         const bottommost = Math.max(row1, row2, row3, row4);
-        ctx.rect(leftmost*this.cell_size+this.cell_size/2, topmost*this.cell_size+this.cell_size/2, (rightmost-leftmost)*this.cell_size, (bottommost-topmost)*this.cell_size);
+        ctx.rect(leftmost*this.model.cell_size+this.model.cell_size/2, topmost*this.model.cell_size+this.model.cell_size/2, (rightmost-leftmost)*this.model.cell_size, (bottommost-topmost)*this.model.cell_size);
     }
-    drawCell(ctx, coord, highlighted, r) {
-        const radius = r || 40;
-        const highlit = highlighted || false;
-        const [row, col] = coord;
-        ctx.arc(col*this.cell_size+this.cell_size/2, row*this.cell_size+this.cell_size/2, radius, 0, 2.1*Math.PI);
-        if (highlighted) {
-            ctx.strokeStyle = 'black';
-            ctx.lineWidth = 10;
+
+    drawShape(ctx, coords) {
+        this.outlineShape(ctx, coords);
+        ctx.fillStyle = this.getColor();
+        ctx.beginPath();
+        //find all edges between points
+        const edges = this.getEdges(coords);
+        //find all corners shared by 4 cells
+        const corners = this.getCorners(edges);
+        //const cornersPos = corners.map(corner => corner.map(coord => this.coordToPos(coord)));
+        //iterate over the voters, and draw (and pop) the edges and corners as we go
+        for(let coord of coords) {
+            this.drawCell(ctx, coord);
+            //draw all edges that contain this cell
+            for(let edge of edges) {
+                if(arrayIncludes(edge, coord)) {
+                    this.drawEdge(ctx, edge);
+                    //edges.splice(edges.indexOf(edge), 1);
+                }
+            }
+            //draw all corners that contain this cell
+            for(let corner of corners) {
+                if(arrayIncludes(corner, coord)) {
+                    this.drawCorner(ctx, corner);
+                    //corners.splice(corners.indexOf(corner), 1);
+                }
+            }
+        }
+        ctx.fill()
+    }
+    outlineShape(ctx, coords) {
+        ctx.strokeStyle = this.voters.length == this.model.district_size ? this.getColor(true) : '#ffaa00ff';
+        ctx.lineWidth = this.voters.length == this.model.district_size ? 10 : 20;
+        
+        //find all edges between points
+        const edges = this.getEdges(coords);
+        //iterate over the voters, and draw (and pop) the edges
+        for(let coord of coords) {
+            ctx.beginPath();
+            this.drawCell(ctx, coord);
             ctx.stroke();
-        }
-    }
-    areNeighbors(coord1, coord2) {
-        const [row1, col1] = coord1;
-        const [row2, col2] = coord2;
-        return (row1 === row2 && Math.abs(col1 - col2) === 1) || (col1 === col2 && Math.abs(row1 - row2) === 1);
-    }
-
-
-    addVoter(voter) {
-        this.voters.push(voter);
-    }
-    removeVoter(voter) {
-        this.voters = this.voters.filter(v => !voter.equals(v));
-    }
-    contains(voter) {
-        return this.voters.some(v => voter.equals(v));
-    }
-    equals(other) {
-        return this.voters.length == other.voters.length && this.voters.every(v => other.contains(v));
-    }
-}
-
-class DistrictManager {
-    constructor(model) {
-        if(model.districts) {
-            this.districts = model.districts;
-        } else {
-            this.districts = [];
-        }
-        this.model = model;
-        this.mousetarget = model.canvasRef.current;
-        const use_mouse = model.districts_interactive;
-        if(use_mouse) {
-            this.mouse = new Mouse(model.props.id, this.mousetarget, (x, y) => this.mouseMove(x, y), (x, y) => this.mouseDown(x, y), (x, y) => this.mouseUp(x, y));
-        }
-        this.currently_drawing = new District([], this.model.cell_size, this.model.district_size, this.model.colors);
-        this.currently_drawing_path = [];
-        this.voters = this.model.voters;
-    }
-
-    getDistrict(row, col) {
-        //see if (row, col) is in any district
-        for (let i = 0; i < this.districts.length; i++) {
-            const district = this.districts[i];
-            if (district.contains(this.getVoter(row, col))) {
-                return district;
-            }
-        }
-    }
-
-    getVoter(row, col) {
-        return this.voters[row*this.model.grid_size + col];
-    }
-
-    mouseDown(x, y) {
-        
-        //find the district that contains the currently clicked cell
-        
-        //get row and col of the cell clicked (make sure between 0 and 4)
-        const row = Math.min(Math.max(Math.floor(y / this.model.cell_size), 0), this.model.grid_size-1);
-        const col = Math.min(Math.max(Math.floor(x / this.model.cell_size), 0), this.model.grid_size-1);
-
-        const district = this.getDistrict(row, col);
-        if (district) {
-            //remove the district from the list of districts
-            this.districts = this.districts.filter(d => d !== district);
-            this.currently_drawing = district;
-        }
-        else {
-            this.currently_drawing.addVoter(this.voters[col+row*this.model.grid_size]);
-        }
-        this.currently_drawing_path.push(row*this.model.grid_size+col);
-        this.model.update();
-    }
-    mouseUp(x, y) {
-        //see if the currently drawing district is valid
-        /*if (this.currently_drawing.voters.length == this.model.district_size) {
-            //add the district to the list of districts
-            this.districts.push(this.currently_drawing);
-        }*/
-        if(this.currently_drawing.voters.length > 0) {
-            this.districts.push(this.currently_drawing);
-        }
-        //trying to handle the case where the user clicks on a cell that is already in a district and doesnt extend the district
-        /*if(this.currently_drawing_path.length==1) {
-            const voter = this.voters[this.currently_drawing_path[0]];
-            console.log(this.currently_drawing_path, voter);
-            const [row, col] = [voter.row, voter.col];
-            const district = this.getDistrict(row, col);
-            if(district) {
-                district.removeVoter(this.getVoter(row, col));
-                if(district.voters.length==0) {
-                    this.districts = this.districts.filter(d => d !== district);
-                }
-                const split = district.findSplit();
-                if(split) {
-                    this.districts = this.districts.filter(d => d !== district);
-                    this.districts.push(new District(split[0], this.model.cell_size, this.model.district_size, this.model.colors), new District(split[1], this.model.cell_size, this.model.district_size, this.model.colors));
+            //draw all edges that contain this cell
+            for(let edge of edges) {
+                if(arrayIncludes(edge, coord)) {
+                    ctx.beginPath();
+                    this.drawEdge(ctx, edge);
+                    ctx.stroke();
                 }
             }
-        }*/
-        //clear the currently drawing district
-        this.currently_drawing = new District([], this.model.cell_size, this.model.district_size, this.model.colors);
-        this.currently_drawing_path = [];
-        this.model.update();
-    }
-    mouseMove(x, y) {
-        if(!this.mouse.pressed) return;
-        //find the cell that the mouse is currently over
-        const row = Math.min(Math.max(Math.floor(y / this.model.cell_size), 0), this.model.grid_size-1);
-        const col = Math.min(Math.max(Math.floor(x / this.model.cell_size), 0), this.model.grid_size-1);
-        const voter = this.getVoter(row, col);
-
-         //if the cell doesn't neighbor any other cell in the currently drawing district, skip
-         if (this.currently_drawing.voters.length!= 0 && !this.currently_drawing.voters.some(v => this.currently_drawing.areNeighbors([v.row, v.col], [row, col]))) {
-            return;
         }
-        //handle backtracking
-        //see if cell is previous in currently drawing path
-        /*if (this.currently_drawing_path[this.currently_drawing_path.length-2] == row*5+col) {
-            //remove the last cell from the currently drawing path
-            const pos = this.currently_drawing_path.pop();
-            //remove the last cell from the currently drawing district if it is not anywhere else in the path
-            if(!this.currently_drawing_path.includes(pos)) {
-                this.currently_drawing.removeVoter(this.voters[pos]);
+        ctx.stroke()
+    }
+
+    getWinning() {
+        const voters_per_party = {};
+        for (let voter of this.voters) {
+            if (voters_per_party[voter.party] === undefined) {
+                voters_per_party[voter.party] = 0;
             }
-            //return
-            return;
-        }*/
-
-        //if the district is already full, skip
-        if (this.currently_drawing.voters.length == this.model.district_size) {
-            return;
+            voters_per_party[voter.party]++;
         }
-        //if the cell overlaps an existing district, remove the district
-        const district = this.getDistrict(row, col);
-        if (district) {
-            //remove the district from the list of districts
-            //this.districts = this.districts.filter(d => d !== district);
-
-
-            district.removeVoter(voter);
-            if(district.voters.length == 0) {
-                this.districts = this.districts.filter(d => d !== district);
-            } else {
-                const split = district.findSplit();
-                if (split) {
-                    this.districts = this.districts.filter(d => d !== district);
-                    this.districts.push(new District(split[0], this.model.cell_size, this.model.district_size, this.model.colors), new District(split[1], this.model.cell_size, this.model.district_size, this.model.colors));
-                }
-            }   
+        //find the party with the most voters, return 2 if there is a tie
+        const max = Math.max(...Object.values(voters_per_party));
+        const winning_parties = Object.keys(voters_per_party).filter(party => voters_per_party[party] === max);
+        if (winning_parties.length > 1) {
+            return 2;
         }
-        //if the cell is not in the currently drawing list, add it
-        if (!this.currently_drawing.contains(voter)) {
-            this.currently_drawing.addVoter(voter);
-        }
-        //see if cell is previous in currently drawing path
-        if (this.currently_drawing_path[this.currently_drawing_path.length-1] != row*this.model.grid_size+col) {
-            this.currently_drawing_path.push(row*this.model.grid_size+col);
-        }
-        this.model.update();
-    }
-    draw(ctx) {
-        //draw each district
-        for (let i = 0; i < this.districts.length; i++) {
-            const district = this.districts[i];
-            const ishighlighted = district.voters.length != this.model.district_size;
-            if (ishighlighted) {
-                district.highlight(ctx, 'rgba(256, 196, 0, 0.2)');
-            }
-            district.draw(ctx);
-        }
-        //draw the currently drawing district
-        this.currently_drawing.draw(ctx);
+        return winning_parties[0];
     }
 
-}
+    getWinner() {
+        if(this.voters.length != this.model.district_size) return null;
+        //find the party with the most voters, return 2 if there is a tie
+        return this.getWinning();
+    }
+    
+}  
 
-export {District, DistrictManager};
+export {DistrictManager, District};

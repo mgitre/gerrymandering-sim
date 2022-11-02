@@ -14,3 +14,6 @@ Specific solutions:
 * Independent redistricting commissions (how do these decide?)
 * Physical restrictions on shape of districts (this cant fix everything)
 * Smaller districts (cons: more representatives, more money)
+
+Some potential sources:
+https://en.wikipedia.org/wiki/Banzhaf_power_index
