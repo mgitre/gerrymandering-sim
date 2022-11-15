@@ -13,7 +13,8 @@ class Model extends React.Component {
         rows, (int) number of rows in grid
         cols, (int) number of columns in grid
         title, (string) title of model
-        gridtype: (string) 'random', 'rows', 'checkerboard' - type of grid to generate
+        gridtype: (string) 'random', 'rows', 'checkerboard', 'defined' - type of grid to generate
+        grid: (2d array) voter grid, only used if gridtype is 'defined'
         district_size: (int) number of voters per district
         districts_interactive: (bool) whether districts are interactive
         voters_interactive: (bool) whether voters are interactive
@@ -80,6 +81,7 @@ class Model extends React.Component {
 
         //initialize voters
         const voter_grid = this.generateVoterGrid(gridtype);
+        this.initial_voter_grid = voter_grid;
         this.voters = [];
         for (let i = 0; i < this.rows; i++) {
             this.voters.push([]);
@@ -162,6 +164,8 @@ class Model extends React.Component {
                 grid.push(row);
             }
             return grid;
+        } else if (gridtype === "defined") {
+            return this.props.grid;
         }
     }
 
@@ -289,10 +293,25 @@ class Model extends React.Component {
         this.draw();
     }
 
+    reset() {
+        this.districts = this.props.preset_district_shape ? this.getPresetDistricts(this.props.preset_district_shape) : [];
+        this.voters = [];
+        for (let i = 0; i < this.rows; i++) {
+            this.voters.push([]);
+            for (let j = 0; j < this.cols; j++) {
+                this.voters[i].push(new Voter(this.initial_voter_grid[i][j], i, j, this));
+            }
+        }
+        this.update();
+    }
+
     render() {
         return (
             <div className="model">
-                <div className="title">{this.title}</div>
+                <div className="model_header">
+                    <div className="title">{this.title}</div>
+                    <div className="model_reset" onClick={() => this.reset()}>Reset</div>
+                </div>
                 <canvas className="interactive" ref={this.canvasRef} width={this.width} height={this.height} style={{width: this.width/2, height: this.height/2}}/>
                 <Stats label="Voters" data={this.state.voters_per_party} colors={this.colors}/>
                 <Stats label="Districts" data={this.state.districts_per_party} colors={this.colors} total={Math.floor(this.rows*this.cols/this.district_size)} />
