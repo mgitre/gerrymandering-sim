@@ -2,6 +2,7 @@
     outline: 2px solid #ccc;
     /*background-image: url('https://github.com/ncase/ballot/raw/217f858ce0cd4a0ee25b19a4fb49df0905007cf0/play/img/axis.png');
     background-size: 100% 100%;*/
+    touch-action: none;
 }
 
 .title {
