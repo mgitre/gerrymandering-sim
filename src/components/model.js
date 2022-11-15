@@ -5,7 +5,7 @@ import Mouse from "./utils/Mouse";
 import {Voter, VoterManager} from "./utils/Voter";
 import "./model.css";
 import { District, DistrictManager } from "./utils/Districts";
-
+import {BarIndicator, OneBar} from "./BarIndicator";
 class Model extends React.Component {
     /* 
         props: 
@@ -45,6 +45,10 @@ class Model extends React.Component {
         voters_interactive, (bool) whether voters are interactive
 
     */
+   /* state variables
+        districts_per_party, (object) number of districts per party
+        voters_per_party, (object) number of voters per party
+   */
     constructor(props) {
         super(props);
 
@@ -70,8 +74,9 @@ class Model extends React.Component {
         //initialize canvas ref
         this.canvasRef = React.createRef();
 
-        //set colors
-        this.colors = {0:"#ff0000ff", 1:"#0000ffff", 2: "#ad14c4ff"};
+        //set colors and names
+        this.colors = {0:"#ff0000ff", 1:"#0000ffff", 'tied': "#ad14c4ff", null: "#33333333"};
+        this.names = {0:"Red", 1:"Blue", 'tied': "Tied", null: "None"};
 
         //initialize voters
         const voter_grid = this.generateVoterGrid(gridtype);
@@ -81,6 +86,11 @@ class Model extends React.Component {
             for (let j = 0; j < this.cols; j++) {
                 this.voters[i].push(new Voter(voter_grid[i][j], i, j, this));
             }
+        }
+
+        this.state = {
+            voters_per_party: {0: 0, 1: 0},
+            districts_per_party: {0: 0, 1: 0}
         }
     }
 
@@ -95,9 +105,16 @@ class Model extends React.Component {
             };
             let grid = [];
             const total = this.rows * this.cols;
-            const half = Math.floor(this.rows * this.cols / 2);
-            const ones = Array(half).fill(1);
-            const zeros = Array(total-half).fill(0);
+            let ones, zeros;
+            //use props.random_distribution to determine distribution of voters, or default to 50/50
+            if(this.props.random_distribution && this.props.random_distribution.length === 2 && this.props.random_distribution[0] + this.props.random_distribution[1] === total) {
+                ones = Array(this.props.random_distribution[1]).fill(1);
+                zeros = Array(this.props.random_distribution[0]).fill(0);
+            } else{
+                const half = Math.floor(this.rows * this.cols / 2);
+                ones = Array(half).fill(1);
+                zeros = Array(total-half).fill(0);
+            }
             const arr = ones.concat(zeros);
             shuffle(arr);
             for (let i = 0; i < this.rows; i++) {
@@ -128,10 +145,27 @@ class Model extends React.Component {
                 grid.push(row);
             }
             return grid;
+        } else if (gridtype === "diagonalsplit") {
+            //1s on top left, 0s on bottom right
+            let grid = [];
+            for (let i = 0; i < this.rows; i++) {
+                let row = [];
+                for (let j = 0; j < this.cols; j++) {
+                    if(i+j < this.rows-1) {
+                        row.push(1);
+                    } else if (i+j > this.rows-1) {
+                        row.push(0);
+                    } else {
+                        row.push((j<this.cols/2) ? 1 : 0);
+                    }
+                }
+                grid.push(row);
+            }
+            return grid;
         }
     }
 
-    getPresetDistricts(shape) {
+    getPresetDistricts(shape, is_static=true) {
         //shape is an array: [rows, cols]
         if(shape[0]*shape[1] !== this.district_size) {
             return null;
@@ -148,7 +182,7 @@ class Model extends React.Component {
                         voters.push(this.voters[i+k][j+l]);
                     }
                 }
-                districts.push(new District(this, voters, true));
+                districts.push(new District(this, voters, is_static));
             }
         }
         return districts;
@@ -158,10 +192,10 @@ class Model extends React.Component {
         this.canvas = this.canvasRef.current;
         this.canvas.oncontextmenu = (e) => e.preventDefault();
         this.ctx = this.canvas.getContext("2d");
-        this.districts = this.getPresetDistricts([1,9])//[]//new District(this, [this.voters[0][0], this.voters[0][1]])];
+        this.districts = this.props.preset_district_shape ? this.getPresetDistricts(this.props.preset_district_shape) : []//this.getPresetDistricts([1,9])//[]//new District(this, [this.voters[0][0], this.voters[0][1]])];
         this.district_manager = new DistrictManager(this);
         this.voter_manager = new VoterManager(this);
-        this.draw();
+        this.update();
     }
 
     drawBG() {
@@ -204,8 +238,54 @@ class Model extends React.Component {
         this.drawBG();
     }
 
+    getVotersPerParty() {
+        //iterate over this.voters and return an object with the number of voters per party
+        let voters_per_party = {0:0, 1:0};
+        for (let i = 0; i < this.rows; i++) {
+            for (let j = 0; j < this.cols; j++) {
+                voters_per_party[this.voters[i][j].party] += 1;
+            }
+        }
+        return voters_per_party;
+    }
+
+    getDistrictsPerParty() {
+        //iterate over this.districts and return an object with the number of districts per party
+        let districts_per_party = {0:0, 1:0, 'tied':0};
+        for(let district of this.districts) {
+            const party = district.getWinner();
+            if(party === null) {
+                continue;
+            }
+            districts_per_party[party] += 1;
+        }
+        return districts_per_party;
+    }
+
+    get_winner(dist) {
+        //distribution: {party: number of votes}
+        //pop tied out of distribution into a separate variable
+        const distribution = {...dist};
+        let tied = distribution['tied'];
+        delete distribution['tied'];
+
+        const max = Math.max(...Object.values(distribution));
+        if(max==0) {
+            return (tied===0) ? null : 'tied';
+        }
+        const winning_parties = Object.keys(distribution).filter(party => distribution[party] === max);
+        if (winning_parties.length > 1) {
+            return 'tied';
+        }
+        return winning_parties[0];
+    }
+
     update() {
         console.log("updating");
+        const vpp = this.getVotersPerParty();
+        const dpp = this.getDistrictsPerParty();
+        const district_winner = this.get_winner(dpp);
+        this.setState({voters_per_party: vpp, districts_per_party: dpp, district_winner: district_winner});
         this.draw();
     }
 
@@ -214,10 +294,30 @@ class Model extends React.Component {
             <div className="model">
                 <div className="title">{this.title}</div>
                 <canvas className="interactive" ref={this.canvasRef} width={this.width} height={this.height} style={{width: this.width/2, height: this.height/2}}/>
+                <Stats label="Voters" data={this.state.voters_per_party} colors={this.colors}/>
+                <Stats label="Districts" data={this.state.districts_per_party} colors={this.colors} total={Math.floor(this.rows*this.cols/this.district_size)} />
+                <OneBar label="Winner" to_show={this.state.district_winner} colors={this.colors} names={this.names}/>
             </div>
+           
         );
     }
-    
 }
+
+function Stats(props) {
+    //props: label, data, colors, total?
+    let pass_to_bar = {}
+    let total = 0;
+    for(let party in props.data) {
+        pass_to_bar[props.colors[party]] = props.data[party];
+        total += props.data[party];
+    }
+
+    //get winner of districts, 2 if tied
+    return (
+        <BarIndicator label={props.label} total={props.total||total} values={pass_to_bar}/>
+    )
+}
+
+
 
 export default Model;

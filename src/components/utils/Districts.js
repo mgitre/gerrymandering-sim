@@ -104,7 +104,6 @@ class DistrictManager {
         if(district && district !== this.currently_drawing_district){
             district.removeVoter(voter);
         }
-
         this.model.update();
 
     }
@@ -449,11 +448,12 @@ class District {
         const max = Math.max(...Object.values(voters_per_party));
         const winning_parties = Object.keys(voters_per_party).filter(party => voters_per_party[party] === max);
         if (winning_parties.length > 1) {
-            return 2;
+            return 'tied';
         }
         return winning_parties[0];
     }
 
+    //return winner for the district for statistics 
     getWinner() {
         if(this.voters.length != this.model.district_size) return null;
         //find the party with the most voters, return 2 if there is a tie
