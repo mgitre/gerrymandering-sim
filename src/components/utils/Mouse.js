@@ -42,8 +42,8 @@ class Mouse {
         //}
     }
     touchmove(e) {
-        this.x = e.changedTouches[0].clientX*2 - this.target.offsetLeft*2;
-        this.y = e.changedTouches[0].clientY*2 - this.target.offsetTop*2;
+        this.x = e.changedTouches[0].pageX*2 - this.target.offsetLeft*2;
+        this.y = e.changedTouches[0].pageY*2 - this.target.offsetTop*2;
         this.moveCallback(this.x, this.y);
     }
     touchstart(e) {
