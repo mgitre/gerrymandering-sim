@@ -1,7 +1,8 @@
 class Mouse {
-    constructor(id, target, moveCallback, downCallback, upCallback) {
+    constructor(id, target, moveCallback, downCallback, upCallback, button) {
         this.id = id;
         this.target = target;
+        this.button = button || 1;
         this.x=0;
         this.y=0;
         this.pressed=false;
@@ -22,15 +23,20 @@ class Mouse {
     }
 
     onmousedown(e) {
-        this.onmousemove(e);
-        this.pressed=true;
-        //console.log('mouse down', this.id, this.x, this.y);
-        this.downCallback(this.x, this.y);
+        if(e.buttons == this.button) {
+            this.onmousemove(e);
+            this.pressed=true;
+            //console.log('mouse down', this.id, this.x, this.y);
+            this.downCallback(this.x, this.y);
+        }
     }
 
+    //TODO: make this work with multiple buttons
     onmouseup(e) {
-        this.pressed=false;
-        this.upCallback(this.x, this.y);
+        //if(e.buttons == this.button) {
+            this.pressed=false;
+            this.upCallback(this.x, this.y);
+        //}
     }
     
 }

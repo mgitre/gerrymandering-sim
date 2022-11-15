@@ -1,0 +1,40 @@
+.progressBar {
+    height: 22px;
+    width: 100%;
+    border-radius: 8px;
+    background-color: #FFFFFF;
+    outline: 3px solid #555;
+    overflow: none;
+    display: flex;
+}
+
+.progressBarEntry {
+    height: 100%;
+    width: 0%;
+    transition: flex-basis 0.6s ease, background-color 0.6s ease;
+    display: inline-block;
+    color: #FFF;
+    text-align: center;
+    line-height: 22px;
+    font-size: 18px;
+    flex: 0 1 auto;
+}
+
+.label {
+    font-size: 24px;
+    text-align: center;
+    font-weight: bold;
+    color: #333;
+    padding-top: 20px;
+    padding-bottom: 4px;
+}
+
+
+@keyframes growIn {
+    0% {
+        transform: scale(0, 1);
+    }
+    100% {
+        transform: scale(1, 1);
+    }
+}

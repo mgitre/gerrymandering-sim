@@ -1,11 +1,10 @@
 .interactive {
-    border: 2px solid #ccc;
+    outline: 2px solid #ccc;
     /*background-image: url('https://github.com/ncase/ballot/raw/217f858ce0cd4a0ee25b19a4fb49df0905007cf0/play/img/axis.png');
     background-size: 100% 100%;*/
 }
 
 .title {
-    font-family: Helvetica, Arial, sans-serif;
     font-size: 28px;
     font-weight: bold;
     color: #333;
@@ -13,23 +12,7 @@
     text-align: center;
 }
 
-.display-bar {
+.model {
     width: 500px;
-    height: 30px;
-    background-color: #ccc;
-    border: 1px solid #999;
-    border-radius: 5px;
-    margin: 10px 0;
-    display: flex;
-}
-.display-bar-party {
-    height: 100%;
-    border-radius: 5px;
-    background-color: #999;
-    color: #fff;
     font-family: Helvetica, Arial, sans-serif;
-    font-size: 24px;
-    font-weight: bold;
-    text-align: center;
-    line-height: 30px;
 }
