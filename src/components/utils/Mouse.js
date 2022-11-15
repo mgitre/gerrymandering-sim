@@ -12,6 +12,9 @@ class Mouse {
         this.target.addEventListener('mousemove', this.onmousemove.bind(this));
         this.target.addEventListener('mousedown', this.onmousedown.bind(this));
         window.addEventListener('mouseup', this.onmouseup.bind(this));
+        this.target.addEventListener('touchmove', this.touchmove.bind(this));
+        this.target.addEventListener('touchstart', this.touchstart.bind(this));
+        window.addEventListener('touchend', this.touchend.bind(this));
     }
     onmousemove(e) {
         this.x = e.offsetX*2;
@@ -38,7 +41,20 @@ class Mouse {
             this.upCallback(this.x, this.y);
         //}
     }
-    
+    touchmove(e) {
+        this.x = e.touches[0].offsetX*2;
+        this.y = e.touches[0].offsetY*2;
+        this.moveCallback(this.x, this.y);
+    }
+    touchstart(e) {
+        this.touchmove(e);
+        this.pressed=true;
+        this.downCallback(this.x, this.y);
+    }
+    touchend(e) {
+        this.pressed=false;
+        this.upCallback(this.x, this.y);
+    }
 }
 
 export default Mouse;
