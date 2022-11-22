@@ -16,13 +16,24 @@ class Mouse {
         this.target.addEventListener('touchstart', this.touchstart.bind(this));
         window.addEventListener('touchend', this.touchend.bind(this));
     }
+
+    activate() {
+        this.active = true;
+    }
+
+    deactivate() {
+        this.active = false;
+    }
+
     onmousemove(e) {
         this.x = e.offsetX*2;
         this.y = e.offsetY*2;
         /*if(this.pressed) {
         console.log('mouse move', this.id, this.x, this.y);
         }*/
-        this.moveCallback(this.x, this.y);
+        if(this.active) {
+            this.moveCallback(this.x, this.y);
+        }
     }
 
     onmousedown(e) {
@@ -30,7 +41,9 @@ class Mouse {
             this.onmousemove(e);
             this.pressed=true;
             //console.log('mouse down', this.id, this.x, this.y);
-            this.downCallback(this.x, this.y);
+            if (this.active) {
+                this.downCallback(this.x, this.y);
+            }
         }
     }
 
@@ -38,22 +51,30 @@ class Mouse {
     onmouseup(e) {
         //if(e.buttons == this.button) {
             this.pressed=false;
-            this.upCallback(this.x, this.y);
+            if (this.active) {
+                this.upCallback(this.x, this.y);
+            }
         //}
     }
     touchmove(e) {
         this.x = e.changedTouches[0].pageX*2 - this.target.offsetLeft*2;
         this.y = e.changedTouches[0].pageY*2 - this.target.offsetTop*2;
-        this.moveCallback(this.x, this.y);
+        if(this.active) {
+            this.moveCallback(this.x, this.y);
+        }
     }
     touchstart(e) {
         this.touchmove(e);
         this.pressed=true;
-        this.downCallback(this.x, this.y);
+        if(this.active) {
+            this.downCallback(this.x, this.y);
+        }
     }
     touchend(e) {
         this.pressed=false;
-        this.upCallback(this.x, this.y);
+        if(this.active) {
+            this.upCallback(this.x, this.y);
+        }
     }
 }
 

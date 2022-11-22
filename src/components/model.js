@@ -199,6 +199,12 @@ class Model extends React.Component {
         this.districts = this.props.preset_district_shape ? this.getPresetDistricts(this.props.preset_district_shape) : []//this.getPresetDistricts([1,9])//[]//new District(this, [this.voters[0][0], this.voters[0][1]])];
         this.district_manager = new DistrictManager(this);
         this.voter_manager = new VoterManager(this);
+        if(this.districts_interactive) {
+            this.districtMode();
+        } else {
+            this.voterMode();
+        }
+
         this.update();
     }
 
@@ -293,6 +299,18 @@ class Model extends React.Component {
         this.draw();
     }
 
+    districtMode() {
+        this.district_manager.activate();
+        this.voter_manager.deactivate();
+        this.setState({mode: "district"});
+    }
+
+    voterMode() {
+        this.district_manager.deactivate();
+        this.voter_manager.activate();
+        this.setState({mode: "voter"});
+    }
+
     reset() {
         this.districts = this.props.preset_district_shape ? this.getPresetDistricts(this.props.preset_district_shape) : [];
         this.voters = [];
@@ -302,6 +320,11 @@ class Model extends React.Component {
                 this.voters[i].push(new Voter(this.initial_voter_grid[i][j], i, j, this));
             }
         }
+        //this.canvas.style.backgroundColor = "#dddddd";
+        //setTimeout(() => this.canvas.style.backgroundColor = "#ffffff", 300);
+        this.canvas.style.outline = "10px solid #333";
+        //this.canvas.style.transition = 'outline 0.3s';
+        setTimeout(() => this.canvas.style.outline = "2px solid #606060", 200);
         this.update();
     }
 
@@ -309,10 +332,14 @@ class Model extends React.Component {
         return (
             <div className="model">
                 <div className="model_header">
-                    <div className="title">{this.title}</div>
+                    <div className="title">{this.title}<div className="model_subtitle">
+                    Click and drag to draw districts. Each district must contain {this.district_size} voters. Click on a voter in a district to remove it from its district.
+                </div></div>
                     <div className="model_reset" onClick={() => this.reset()}>Reset</div>
                 </div>
+                
                 <canvas className="interactive" ref={this.canvasRef} width={this.width} height={this.height} style={{width: this.width/2, height: this.height/2}}/>
+                <ModeSelector mode={this.state.mode} districts_interactive={this.districts_interactive} voters_interactive={this.voters_interactive} districtMode={() => this.districtMode()} voterMode={() => this.voterMode()}/>
                 <Stats label="Voters" data={this.state.voters_per_party} colors={this.colors}/>
                 <Stats label="Districts" data={this.state.districts_per_party} colors={this.colors} total={Math.floor(this.rows*this.cols/this.district_size)} />
                 <OneBar label="Winner" to_show={this.state.district_winner} colors={this.colors} names={this.names}/>
@@ -337,6 +364,21 @@ function Stats(props) {
     )
 }
 
-
+function ModeSelector(props) {
+    //props: districts_interactive (bool), voters_interactive (bool), mode (str), districtMode (function), voterMode (function)
+    console.log(props);
+    if(props.districts_interactive && props.voters_interactive) {
+        return (
+            <div>
+                <div className="mode_label">Drawing:</div>
+                <div className="mode_selector">
+                    {props.districts_interactive ? <div className="mode_button" onClick={props.districtMode} style={{backgroundColor: props.mode=='district' ? "lightblue" : "white"}}>Districts</div> : null}
+                    {props.voters_interactive ? <div className="mode_button" onClick={props.voterMode} style={{backgroundColor: props.mode=="voter" ? "lightblue" : "white"}}>Voters</div> : null}
+                </div>
+            </div>
+        )
+    }
+    return null;
+}
 
 export default Model;

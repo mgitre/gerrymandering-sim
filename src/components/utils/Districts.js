@@ -21,6 +21,14 @@ class DistrictManager {
         }
     }
 
+    activate() {
+        if(this.model.districts_interactive) this.mouse.activate();
+    }
+
+    deactivate() {
+        if(this.model.districts_interactive) this.mouse.deactivate();
+    }
+
     getVoter(row, col) {
         return this.model.voters[row][col];
     }
@@ -105,7 +113,6 @@ class DistrictManager {
             district.removeVoter(voter);
         }
         this.model.update();
-
     }
     mouseUp(x, y) {
         this.currently_drawing_district = null;
@@ -415,7 +422,7 @@ class District {
     }
     outlineShape(ctx, coords) {
         ctx.strokeStyle = this.voters.length == this.model.district_size ? this.getColor(true) : '#ffaa00ff';
-        ctx.lineWidth = this.voters.length == this.model.district_size ? 10 : 20;
+        ctx.lineWidth = this.voters.length == this.model.district_size ? 6 : 12;
         
         //find all edges between points
         const edges = this.getEdges(coords);
