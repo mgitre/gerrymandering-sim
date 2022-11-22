@@ -210,7 +210,7 @@ class Model extends React.Component {
 
     drawBG() {
         //draw gridlines
-        this.ctx.strokeStyle = "#606060ff";
+        this.ctx.strokeStyle = "#555555ff";
         this.ctx.lineWidth = 5;
         for(let i=1; i<this.rows; i++) {
             this.ctx.beginPath();
@@ -322,9 +322,9 @@ class Model extends React.Component {
         }
         //this.canvas.style.backgroundColor = "#dddddd";
         //setTimeout(() => this.canvas.style.backgroundColor = "#ffffff", 300);
-        this.canvas.style.outline = "10px solid #333";
+        this.canvas.style.outline = "10px solid #303030";
         //this.canvas.style.transition = 'outline 0.3s';
-        setTimeout(() => this.canvas.style.outline = "2px solid #606060", 200);
+        setTimeout(() => this.canvas.style.outline = "2px solid #303030", 200);
         this.update();
     }
 
@@ -372,8 +372,8 @@ function ModeSelector(props) {
             <div>
                 <div className="mode_label">Drawing:</div>
                 <div className="mode_selector">
-                    {props.districts_interactive ? <div className="mode_button" onClick={props.districtMode} style={{backgroundColor: props.mode=='district' ? "lightblue" : "white"}}>Districts</div> : null}
-                    {props.voters_interactive ? <div className="mode_button" onClick={props.voterMode} style={{backgroundColor: props.mode=="voter" ? "lightblue" : "white"}}>Voters</div> : null}
+                    <div className="mode_button" onClick={props.districtMode} style={{backgroundColor: props.mode=='district' ? "#cdf" : "white", borderRadius: '8px 0px 0px 8px'}}>Districts</div>
+                    <div className="mode_button" onClick={props.voterMode} style={{backgroundColor: props.mode=="voter" ? "#cdf" : "white", borderRadius: '0px 8px 8px 0px'}}>Voters</div>
                 </div>
             </div>
         )

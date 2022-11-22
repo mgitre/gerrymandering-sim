@@ -1,5 +1,5 @@
 .interactive {
-    outline: 2px solid #606060;
+    outline: 2px solid #303030;
     /*background-image: url('https://github.com/ncase/ballot/raw/217f858ce0cd4a0ee25b19a4fb49df0905007cf0/play/img/axis.png');
     background-size: 100% 100%;*/
     touch-action: none;
@@ -9,7 +9,7 @@
 .title {
     font-size: 28px;
     font-weight: bold;
-    color: #333;
+    color: #303030;
     width: 500px;
     text-align: center;
     flex: 1 1 auto;
@@ -31,7 +31,7 @@
     flex: 0 0 auto;
     background-color: #eee;
     color: #333;
-    outline: 1px solid #ccc;
+    outline: 1px solid #c0c0c0;
     border-radius: 20px;
     padding: 10px;
     font-size: 18px;
@@ -70,7 +70,7 @@
 }
 
 .mode_button:hover {
-    filter: brightness(0.9);
+    filter: brightness(0.94);
 }
 
 .mode_label {
