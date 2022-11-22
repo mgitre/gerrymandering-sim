@@ -1,8 +1,9 @@
 .interactive {
-    outline: 2px solid #ccc;
+    outline: 2px solid #606060;
     /*background-image: url('https://github.com/ncase/ballot/raw/217f858ce0cd4a0ee25b19a4fb49df0905007cf0/play/img/axis.png');
     background-size: 100% 100%;*/
     touch-action: none;
+    transition: outline 0.15s ease-in;
 }
 
 .title {
@@ -21,7 +22,8 @@
 
 .model_header {
     display: flex;
-    padding: 10px;
+    padding: 5px;
+    align-items: center;
 }
 
 .model_reset {
@@ -29,9 +31,61 @@
     flex: 0 0 auto;
     background-color: #eee;
     color: #333;
-    border: 1px solid #ccc;
-    border-radius: 3px;
+    outline: 1px solid #ccc;
+    border-radius: 20px;
+    padding: 10px;
+    font-size: 18px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    min-height: 40px;
+    background-image: url('https://fonts.gstatic.com/s/i/materialicons/refresh/v16/24px.svg');
+    background-size: 100% 100%;
+    color: #00000000;
+}
+
+.model_reset:hover {
+    background-color: #ddd;
+}
+
+.mode_selector {
+    display: flex;
+    height: 28px;
+    width: 100%;
+    border-radius: 8px;
+    outline: 3px solid #555;
+}
+
+.mode_button {
+    cursor:pointer;
+    flex: 1 1 50%;
+    background-color: #eee;
+    color: #333;
     padding: 5px 10px;
     font-size: 18px;
     font-weight: bold;
+    padding: 5px;
+    text-align: center;
+    border-radius: 8px;
+}
+
+.mode_button:hover {
+    filter: brightness(0.9);
+}
+
+.mode_label {
+    font-size: 24px;
+    text-align: center;
+    font-weight: bold;
+    color: #333;
+    padding-top: 20px;
+    padding-bottom: 4px;
+}
+
+.model_subtitle {
+    font-size: 18px;
+    color: #777;
+    text-align: center;
+    padding-bottom: 5px;
+    font-weight: normal;
 }
