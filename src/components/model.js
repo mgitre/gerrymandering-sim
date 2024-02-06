@@ -330,10 +330,10 @@ class Model extends React.Component {
 
     render() {
         return (
-            <div className="model">
+            <div className="model" style={{width: this.width/2, height: this.height/2}}>
                 <div className="model_header">
                     <div className="title">{this.title}<div className="model_subtitle">
-                    Click and drag to draw districts. Each district must contain {this.district_size} voters. Click on a voter in a district to remove it from its district.
+                    Click and drag to draw districts. Each district must contain {this.district_size} voters. {this.voters_interactive ? 'Click on a voter in a district to remove it from its district.' : null}
                 </div></div>
                     <div className="model_reset" onClick={() => this.reset()}>Reset</div>
                 </div>
