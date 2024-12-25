@@ -1,3 +1,3 @@
 # Mandr
 
-An interactive gerrymandering simulator.
+An interactive gerrymandering simulator. Live at [https://gerrymandr.onrender.com/](https://gerrymandr.onrender.com/)
